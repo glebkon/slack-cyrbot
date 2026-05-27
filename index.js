@@ -1,25 +1,25 @@
 require('dotenv').config();
 const { App } = require('@slack/bolt');
 
-const MAP = {
-  'shh':'щ','sh':'ш','zh':'ж','ch':'ч','ts':'ц','ya':'я','yu':'ю','yo':'ё',
-  'a':'а','b':'б','v':'в','g':'г','d':'д','e':'е','z':'з','i':'и',
-  'j':'й','k':'к','l':'л','m':'м','n':'н','o':'о','p':'п','r':'р',
-  's':'с','t':'т','u':'у','f':'ф','h':'х','y':'ы','x':'кс',
-  'A':'А','B':'Б','V':'В','G':'Г','D':'Д','E':'Е','Z':'З','I':'И',
-  'J':'Й','K':'К','L':'Л','M':'М','N':'Н','O':'О','P':'П','R':'Р',
-  'S':'С','T':'Т','U':'У','F':'Ф','H':'Х','Y':'Ы'
-};
-
-function latinToCyrillic(text) {
-  let result = '', i = 0;
-  while (i < text.length) {
-    if (MAP[text.slice(i, i+3)])      { result += MAP[text.slice(i, i+3)]; i += 3; }
-    else if (MAP[text.slice(i, i+2)]) { result += MAP[text.slice(i, i+2)]; i += 2; }
-    else if (MAP[text[i]])            { result += MAP[text[i]]; i++; }
-    else                              { result += text[i]; i++; }
-  }
-  return result;
+async function latinToCyrillic(text) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: `Це повідомлення написане латинськими літерами як транслітерація російської мови. Перетвори його назад у нормальний російський текст. Поверни ТІЛЬКИ перетворений текст, без пояснень.\n\n${text}`
+      }]
+    })
+  });
+  const data = await response.json();
+  return data.content[0].text;
 }
 
 const app = new App({
@@ -28,16 +28,15 @@ const app = new App({
   socketMode: true,
 });
 
-// Префікс "!" — бот відповідає в тред
-app.message(/^!/, async ({ message, say }) => {
-  const converted = latinToCyrillic(message.text.slice(1).trim());
-  await say({ text: converted, thread_ts: message.ts });
-});
+app.message(/^!/, async ({ message, client }) => {
+  const text = message.text.slice(1).trim();
+  const converted = await latinToCyrillic(text);
 
-// Slash команда /cyr
-app.command('/cyr', async ({ command, ack, say }) => {
-  await ack();
-  await say(`*${command.user_name}:* ${latinToCyrillic(command.text)}`);
+  await client.chat.postMessage({
+    channel: message.channel,
+    thread_ts: message.ts,
+    text: converted,
+  });
 });
 
 (async () => {
