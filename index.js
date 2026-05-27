@@ -43,7 +43,6 @@ app.message(/^!/, async ({ message, client }) => {
 
   await client.chat.postMessage({
     channel: message.channel,
-    thread_ts: message.ts,
     text: converted,
   });
 });
