@@ -16,13 +16,12 @@ async function latinToCyrillic(text) {
         role: 'user',
         content: `Це повідомлення написане латинськими літерами як транслітерація російської мови. 
 Перетвори його назад у нормальний російський текст.
-
 Правила:
 - Email адреси НЕ перекладай, залишай як є
 - Посилання та URL НЕ перекладай, залишай як є
 - Назву "Ebitdo" НЕ перекладай, залишай як є
+- Текст в дужках () НЕ перекладай, залишай як є
 - Поверни ТІЛЬКИ перетворений текст, без пояснень
-
 ${text}`
       }]
     })
@@ -40,9 +39,17 @@ const app = new App({
 app.message(/^!/, async ({ message, client }) => {
   const text = message.text.slice(1).trim();
   const converted = await latinToCyrillic(text);
-
   await client.chat.postMessage({
     channel: message.channel,
+    text: converted,
+  });
+});
+
+app.command('/cyr', async ({ command, ack, client }) => {
+  await ack();
+  const converted = await latinToCyrillic(command.text);
+  await client.chat.postMessage({
+    channel: command.channel_id,
     text: converted,
   });
 });
